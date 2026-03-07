@@ -1,0 +1,495 @@
+## Build and Run (uv)
+
+This repo now includes a minimal v1 implementation under `narrative/`.
+
+### Setup
+
+```bash
+uv sync
+```
+
+### Run examples
+
+```bash
+uv run python examples/success.py
+uv run python examples/basic.py
+uv run python examples/basic_ollama.py
+```
+
+### FastAPI demo (with basic SQLite DB)
+
+Run:
+
+```bash
+uv sync
+uv run python -m examples.fastapi_app.run
+```
+
+Optional (enable Ollama failure analysis in API stories):
+
+```bash
+NARRATIVE_USE_OLLAMA=1 uv run python -m examples.fastapi_app.run
+```
+
+Endpoints:
+
+- `GET /health`
+- `POST /customers` with JSON body: `{"name":"Alice","email":"alice@example.com"}`
+- `GET /customers`
+
+### Ollama Failure Analysis (qwen2.5-coder:7b)
+
+Use the analyzer in code:
+
+```python
+from narrative import OllamaFailureAnalyzer, stage, story
+
+with story("Import Customers", failure_analyzer=OllamaFailureAnalyzer(model="qwen2.5-coder:7b")):
+    ...
+```
+
+If Ollama is unavailable, runtime falls back to non-LLM failure output.
+
+---
+
+Below is a **clean handoff document** you can give to another LLM (or coding agent).
+It summarizes the entire conversation **without conversational noise** and focuses on **architecture, goals, constraints, and implementation direction**.
+
+---
+
+# Runtime Narrative Logging — LLM Implementation Brief
+
+## 1. Project Overview
+
+This project introduces a new abstraction for application observability called **Runtime Narrative Logging**.
+
+Instead of traditional logging (which records events), this system models program execution as a **narrative of stages** that describe what the system is trying to accomplish.
+
+The system should produce **human-readable execution narratives** that explain:
+
+* What the program was trying to do
+* What stage of the process it was in
+* Where a failure occurred
+* How far the process progressed
+* The root cause of the failure
+
+The goal is to produce output that allows a developer to understand system behavior **without reading code or scanning stack traces**.
+
+This system is **not meant to replace logging frameworks**, but to operate at a **higher abstraction level describing execution intent**.
+
+---
+
+# 2. Core Philosophy
+
+Traditional logging answers:
+
+> "What happened?"
+
+Runtime Narrative Logging answers:
+
+> "What story was the system trying to tell, and where did it break?"
+
+Key principles:
+
+1. Execution is modeled as **stories**
+2. Stories consist of **stages**
+3. Failures interrupt stories
+4. Progress is derived from completed stages
+5. Logging becomes a **side effect of narration**
+6. The system must remain **zero configuration**
+
+---
+
+# 3. Key Design Goals
+
+### Developer Experience
+
+The library must be:
+
+* Zero configuration
+* Python-native
+* Easy for junior developers to understand
+* Drop-in for existing code
+
+Usage should look like:
+
+```python
+from narrative import story, stage
+
+with story("Process Orders"):
+    with stage("Validate Input"):
+        pass
+
+    with stage("Fetch Orders"):
+        pass
+
+    with stage("Transform Orders"):
+        raise ValueError("invalid price")
+```
+
+---
+
+# 4. Core Runtime Model
+
+The system models execution using four primitives.
+
+```
+Story
+ ├─ Stage
+ │   ├─ Events
+ │   └─ Failure
+ └─ Outcome
+```
+
+---
+
+# 5. Core Concepts
+
+## 5.1 Story
+
+A **Story** represents a single execution flow.
+
+Examples:
+
+* One API request
+* One CLI command
+* One background job
+* One ETL pipeline execution
+
+Properties:
+
+* unique id
+* start time
+* list of stages
+* final outcome (success/failure)
+* progress calculation
+
+---
+
+## 5.2 Stage
+
+A **Stage** represents a meaningful step in execution.
+
+Examples:
+
+* Validate Input
+* Authenticate User
+* Fetch Data
+* Transform Data
+* Persist Results
+
+Properties:
+
+* name
+* start time
+* completion status
+* failure information
+
+Stages must support:
+
+* nesting
+* start/end lifecycle
+* failure capture
+
+Stages are implemented using **context managers**.
+
+---
+
+## 5.3 Event (Optional)
+
+Events provide informational messages inside stages.
+
+Examples:
+
+* "Fetched 1200 records"
+* "Retrying connection"
+
+Events do **not affect progress**.
+
+---
+
+## 5.4 Failure
+
+Failures occur when an exception interrupts a stage.
+
+The system should capture:
+
+* exception type
+* exception message
+* stage name
+* root cause location (file, line, function)
+* progress percentage
+
+Example output:
+
+```
+❌ STORY FAILED
+Story: Process Orders
+Stage: Transform Orders
+Location: pricing.py:142 (normalize_prices)
+Error: ValueError - invalid price format
+Progress: 62% (5 / 8 stages completed)
+```
+
+The full traceback should remain available but should not be the primary output.
+
+---
+
+# 6. Progress Calculation
+
+Progress should be derived from stages.
+
+```
+progress = completed_stages / total_stages
+```
+
+Example:
+
+```
+Total stages: 8
+Completed: 5
+Active: 1
+
+Progress: 62%
+```
+
+Progress bars and UI visualizations should subscribe to these values but should not be part of the core runtime.
+
+---
+
+# 7. Runtime Context Management
+
+The system must track the active Story and Stage without passing parameters through function calls.
+
+Use **Python ContextVar** for execution-scoped state.
+
+Example variables:
+
+```
+current_story: ContextVar
+current_stage: ContextVar
+```
+
+This allows the narrative context to propagate automatically across:
+
+* function calls
+* threads
+* async tasks
+* framework middleware
+
+---
+
+# 8. Runtime Events
+
+The core runtime should emit structured lifecycle events:
+
+```
+StoryStarted
+StageStarted
+StageCompleted
+FailureOccurred
+StoryCompleted
+```
+
+Renderers can subscribe to these events.
+
+---
+
+# 9. Output Rendering
+
+The system should support renderers.
+
+Initial implementation should provide a **console renderer**.
+
+Example console output:
+
+```
+▶ Story started: Process Orders
+
+✔ Stage completed: Validate Input
+✔ Stage completed: Connect Database
+
+▶ Stage started: Transform Orders
+
+❌ Failure detected
+Stage: Transform Orders
+Cause: invalid literal for int()
+Location: pricing.py:142 (normalize_prices)
+Progress: 62%
+
+▶ Story ended: FAILED
+```
+
+Rendering should be separated from the runtime core.
+
+---
+
+# 10. Root Cause Detection
+
+Failures should identify the **root cause frame**.
+
+Instead of printing the full traceback, the system should:
+
+1. analyze the traceback
+2. identify the most relevant frame
+3. extract:
+
+```
+filename
+line number
+function name
+```
+
+The full traceback should remain available for debugging.
+
+---
+
+# 11. Scaling to Large Applications
+
+Each execution (request/job/task) should generate **one Story**.
+
+Applications may have hundreds of endpoints, but narratives remain consistent.
+
+Framework adapters should define canonical stages such as:
+
+```
+Request Received
+Authentication
+Authorization
+Validation
+Business Logic
+Persistence
+Response
+```
+
+Endpoints may add nested stages inside business logic.
+
+Example:
+
+```
+Story (API Request)
+ ├ Authentication
+ ├ Validation
+ ├ Business Logic
+ │    ├ Calculate Pricing
+ │    ├ Apply Discounts
+ │    └ Reserve Inventory
+ └ Response
+```
+
+This ensures consistent narratives across endpoints.
+
+---
+
+# 12. Non-Goals (for v1)
+
+The following features should NOT be implemented initially:
+
+* logging framework integrations
+* OpenTelemetry
+* cloud logging
+* distributed tracing
+* async-specific features
+* AI analysis
+* dashboards
+
+These can be added later once the narrative core is stable.
+
+---
+
+# 13. Minimal Implementation Plan
+
+The first version should include:
+
+### Core runtime
+
+* Story class
+* Stage class
+* failure detection
+* progress calculation
+
+### Context management
+
+* ContextVar-based story tracking
+* ContextVar-based stage tracking
+
+### API
+
+```
+story(name)
+stage(name)
+```
+
+### Rendering
+
+* console output
+
+### Failure summarization
+
+* root cause frame detection
+
+---
+
+# 14. Initial File Structure
+
+Suggested minimal structure:
+
+```
+narrative/
+    __init__.py
+    story.py
+    stage.py
+    context.py
+    events.py
+    failure.py
+    renderer/
+        console.py
+```
+
+For the first iteration, a **single-file implementation is acceptable**.
+
+---
+
+# 15. Expected Outcome
+
+The result should be a Python library that allows developers to write code like:
+
+```python
+with story("Import Customers"):
+
+    with stage("Load CSV"):
+        load_file()
+
+    with stage("Validate Data"):
+        validate()
+
+    with stage("Insert Records"):
+        insert()
+```
+
+And produce output that explains execution clearly.
+
+---
+
+# 16. Long-Term Vision
+
+Future capabilities may include:
+
+* progress bars
+* AI-assisted error explanations
+* structured execution telemetry
+* integration with error monitoring tools
+* FastAPI/Django middleware
+* distributed narrative tracing
+
+However, these should only be added after the **narrative execution core is proven**.
+
+---
+
+# Final Statement
+
+This project redefines logging by modeling execution as a **human-readable story**.
+
+Programs already know what they are doing.
+
+This system helps them explain it.
