@@ -1,2 +1,37 @@
-*.venv
+# Virtual environments
+.venv/
+
+# Environment files
 *.env
+.env.*
+
+# Build / distribution
+dist/
+build/
+*.egg-info/
+*.whl
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# uv
+.uv/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log

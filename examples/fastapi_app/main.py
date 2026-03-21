@@ -6,29 +6,41 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from narrative import OllamaFailureAnalyzer, stage, story
+from better_logger import BetterLoggerMiddleware, JsonRenderer, OllamaFailureAnalyzer, stage, story
 
 from .db import create_customer, init_db, list_customers
 
-USE_OLLAMA = os.getenv("NARRATIVE_USE_OLLAMA", "0") == "1"
-MODEL = os.getenv("NARRATIVE_OLLAMA_MODEL", "qwen2.5-coder:7b")
-failure_analyzer = OllamaFailureAnalyzer(model=MODEL) if USE_OLLAMA else None
+_model = os.getenv("BETTER_LOGGER_MODEL")
+_endpoint = os.getenv("BETTER_LOGGER_ENDPOINT", "http://127.0.0.1:11434/api/generate")
+failure_analyzer = OllamaFailureAnalyzer(model=_model, endpoint=_endpoint) if _model else None
+
+# Switch to JsonRenderer by setting BETTER_LOGGER_JSON=1
+USE_JSON = os.getenv("BETTER_LOGGER_JSON", "0") == "1"
+renderers = [JsonRenderer()] if USE_JSON else None  # None → default ConsoleRenderer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    with story("FastAPI App Startup", failure_analyzer=failure_analyzer):
+    with story("FastAPI App Startup", renderers=renderers, failure_analyzer=failure_analyzer):
         with stage("Initialize Database"):
             init_db()
     try:
         yield
     finally:
-        with story("FastAPI App Shutdown", failure_analyzer=failure_analyzer):
+        with story("FastAPI App Shutdown", renderers=renderers, failure_analyzer=failure_analyzer):
             with stage("Release Resources"):
                 pass
 
 
-app = FastAPI(title="Narrative Logging FastAPI Demo", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Better Logger FastAPI Demo", version="0.1.0", lifespan=lifespan)
+
+# Middleware wraps every request in a story automatically.
+# Route handlers only need to declare stages — no story() context required.
+app.add_middleware(
+    BetterLoggerMiddleware,
+    renderers=renderers,
+    failure_analyzer=failure_analyzer,
+)
 
 
 class CustomerCreate(BaseModel):
@@ -37,34 +49,31 @@ class CustomerCreate(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    with story("Health Check", failure_analyzer=failure_analyzer):
-        with stage("Build Response"):
-            return {"status": "ok"}
+async def health() -> dict[str, str]:
+    with stage("Build Response"):
+        return {"status": "ok"}
 
 
 @app.post("/customers")
-def add_customer(payload: CustomerCreate) -> dict[str, object]:
-    with story("Create Customer", failure_analyzer=failure_analyzer):
-        with stage("Validate Input"):
-            if "@" not in payload.email:
-                raise ValueError("invalid email")
+async def add_customer(payload: CustomerCreate) -> dict[str, object]:
+    with stage("Validate Input"):
+        if "@" not in payload.email:
+            raise ValueError("invalid email")
 
-        with stage("Insert Into Database"):
-            try:
-                customer = create_customer(payload.name, payload.email)
-            except ValueError as exc:
-                raise HTTPException(status_code=409, detail=str(exc)) from exc
+    with stage("Insert Into Database"):
+        try:
+            customer = create_customer(payload.name, payload.email)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-        with stage("Build Response"):
-            return {"created": True, "customer": customer}
+    with stage("Build Response"):
+        return {"created": True, "customer": customer}
 
 
 @app.get("/customers")
-def get_customers() -> dict[str, object]:
-    with story("List Customers", failure_analyzer=failure_analyzer):
-        with stage("Fetch Customers"):
-            customers = list_customers()
+async def get_customers() -> dict[str, object]:
+    with stage("Fetch Customers"):
+        customers = list_customers()
 
-        with stage("Build Response"):
-            return {"count": len(customers), "customers": customers}
+    with stage("Build Response"):
+        return {"count": len(customers), "customers": customers}

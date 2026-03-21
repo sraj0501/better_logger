@@ -1,6 +1,10 @@
-from narrative import OllamaFailureAnalyzer, stage, story
+import os
 
-analyzer = OllamaFailureAnalyzer(model="qwen2.5-coder:7b")
+from better_logger import OllamaFailureAnalyzer, stage, story
+
+model = os.environ["BETTER_LOGGER_MODEL"]
+endpoint = os.getenv("BETTER_LOGGER_ENDPOINT", "http://127.0.0.1:11434/api/generate")
+analyzer = OllamaFailureAnalyzer(model=model, endpoint=endpoint)
 
 with story("Import Customers", failure_analyzer=analyzer):
     with stage("Load CSV"):

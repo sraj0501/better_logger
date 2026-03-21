@@ -7,9 +7,9 @@ import uvicorn
 
 
 def main() -> None:
-    host = os.getenv("NARRATIVE_HOST", "127.0.0.1")
-    port = int(os.getenv("NARRATIVE_PORT", "8000"))
-    reload_enabled = os.getenv("NARRATIVE_RELOAD", "1") == "1"
+    host = os.getenv("BETTER_LOGGER_HOST", "127.0.0.1")
+    port = int(os.getenv("BETTER_LOGGER_PORT", "8000"))
+    reload_enabled = os.getenv("BETTER_LOGGER_RELOAD", "1") == "1"
     pid = os.getpid()
 
     typer.secho("▶ FastAPI Process: ", fg=typer.colors.GREEN, bold=True, nl=False)
@@ -18,8 +18,10 @@ def main() -> None:
     typer.secho(host, fg=typer.colors.BRIGHT_WHITE)
     typer.secho("▶ FastAPI Port: ", fg=typer.colors.GREEN, bold=True, nl=False)
     typer.secho(str(port), fg=typer.colors.BRIGHT_WHITE)
+    typer.secho("▶ FastAPI URL: ", fg=typer.colors.GREEN, bold=True, nl=False)
+    typer.secho(f"http://{host}:{port}", fg=typer.colors.BRIGHT_WHITE)
 
-    # Suppress uvicorn INFO noise and rely on narrative logs from app lifespan/handlers.
+    # Suppress uvicorn INFO noise and rely on better_logger logs from app lifespan/handlers.
     uvicorn.run(
         "examples.fastapi_app.main:app",
         host=host,

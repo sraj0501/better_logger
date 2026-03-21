@@ -3,16 +3,50 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "runtime-narrative-logging"
+name = "better-logger"
 version = "0.1.0"
-description = "Runtime narrative logging for human-readable execution stories"
+description = "Better logger — model execution as human-readable stories"
 readme = "README.MD"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
-dependencies = [
-    "fastapi>=0.116.0,<1.0.0",
-    "typer>=0.23.0,<1.0.0",
-    "uvicorn>=0.35.0,<1.0.0",
+# TODO: replace with your real name and email before publishing
+authors = [
+    { name = "Shashank Raj", email = "shashank.raj28@gmail.com" },
+]
+keywords = ["logging", "observability", "tracing", "fastapi", "debugging", "better_logger"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Colored terminal output via typer
+console = ["typer>=0.9.0"]
+# FastAPI / Starlette middleware
+fastapi = ["starlette>=0.27.0"]
+# Install everything
+all = [
+    "typer>=0.9.0",
+    "starlette>=0.27.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/better_logger"
+Repository = "https://github.com/YOUR_USERNAME/better_logger"
+"Bug Tracker" = "https://github.com/YOUR_USERNAME/better_logger/issues"
+
 [tool.setuptools]
-packages = ["narrative", "narrative.renderer", "narrative.analyzers"]
+packages = ["better_logger", "better_logger.renderer", "better_logger.analyzers"]

@@ -137,7 +137,7 @@ class ConsoleRenderer:
         event_name = event.__class__.__name__
 
         if event_name == "StoryStarted":
-            self._secho("▶ Story started: ", fg=self._success_color, bold=True, nl=False)
+            self._secho("▶ Stage started: ", fg=self._success_color, bold=True, nl=False)
             self._secho(event.story_name, fg=self._success_value_color, bold=True)
             return
 
