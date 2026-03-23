@@ -22,9 +22,11 @@ RUNTIME_NARRATIVE_MODEL=llama3 RUNTIME_NARRATIVE_ENDPOINT=http://localhost:8000/
 
 # Rich failure diagnostics (locals, etc.) via env
 RUNTIME_NARRATIVE_FAILURE_DIAGNOSTICS=rich uv run python examples/basic.py
-```
 
-No test suite exists yet.
+# Tests (dev dependency group)
+uv sync --group dev
+uv run pytest tests/ -v
+```
 
 ## Architecture
 
@@ -33,7 +35,7 @@ The library (`runtime_narrative/`) models execution as **stories** composed of *
 ### Core execution flow
 
 1. `story(name)` — dual sync/async context manager (`with` / `async with`) that creates a `StoryRuntime`, sets it on `current_story` (a `ContextVar`), and emits `StoryStarted`/`StoryCompleted` events. On exception, builds enriched failure data (see **Diagnostics** below), optionally runs failure analysis, and emits `FailureOccurred` before `StoryCompleted`.
-2. `stage(name)` — dual sync/async context manager that must be nested inside a `story`. Registers a `StageRecord` on the `StoryRuntime`, manages a `current_stage_stack` ContextVar for nesting, and emits `StageStarted`/`StageCompleted` events.
+2. `stage(name)` — dual sync/async context manager that must be nested inside a `story`. Registers a `StageRecord` on the `StoryRuntime`, manages a `current_stage_stack` ContextVar for nesting, and emits `StageStarted`/`StageCompleted` via **`emit()`** (sync). Nested `stage()` inside `async with story` does not use `emit_async`; async renderers’ `handle` coroutines are therefore **not** awaited for stage events (use a sync renderer for full stage coverage, or rely on async emit for story/failure-only paths).
 3. **Context** (`context.py`) — two `ContextVar`s: `current_story` (holds the active `StoryRuntime`) and `current_stage_stack` (holds a list of nested `StageRecord`s). This enables propagation across sync/async without parameter threading.
 4. **Events** (`events.py`) — plain dataclasses: `StoryStarted`, `StageStarted`, `StageCompleted`, `FailureOccurred`, `StoryCompleted`, `LLMAnalysisReady`. `FailureOccurred` includes diagnostics fields (`diagnostics_mode`, `primary_frame_reason`, `stack_frames`, `source_snippet`, `compressed_stack_summary`, `hidden_frame_count`, `traceback_truncated`, optional `locals_by_frame`, `redaction_removed_keys`). `StoryRuntime.emit()` dispatches synchronously; `StoryRuntime.emit_async()` dispatches asynchronously, awaiting renderers whose `handle` is a coroutine function.
 5. **Failure** (`failure.py`) — `summarize_exception()` still produces a minimal `FailureSummary` from a traceback leaf frame. The **story** path uses **`build_enriched_failure()`** in `diagnostics.py`, which picks a **primary** frame (innermost **app** code by default), optional file snippet, structured stack, traceback caps in production, and **rich** locals when enabled.

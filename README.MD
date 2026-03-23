@@ -267,6 +267,13 @@ Events: `StoryStarted`, `StageStarted`, `StageCompleted`, `FailureOccurred`,
 
 `FailureOccurred` carries both the original location fields and the extended diagnostics fields above; custom renderers should use `getattr(event, "diagnostics_mode", "lean")` if they must stay compatible with older library versions.
 
+## Running tests
+
+```bash
+uv sync --group dev
+uv run pytest tests/ -v
+```
+
 ## License
 
 MIT
