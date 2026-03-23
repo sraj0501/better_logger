@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "runtime-narrative"
 version = "0.1.0"
-description = "runtime-narrative — model execution as human-readable stories"
+description = "Model execution as human-readable stories with lean/rich failure diagnostics and optional LLM analysis"
 readme = "README.MD"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -14,7 +14,7 @@ requires-python = ">=3.9"
 authors = [
     { name = "Shashank Raj", email = "shashank.raj28@gmail.com" },
 ]
-keywords = ["logging", "observability", "tracing", "fastapi", "debugging", "runtime_narrative"]
+keywords = ["logging", "observability", "tracing", "fastapi", "debugging", "diagnostics", "runtime_narrative"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
