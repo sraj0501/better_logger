@@ -57,6 +57,23 @@ class StoryRuntime:
             )
         )
 
+    async def on_stage_started_async(self, stage: StageRecord) -> None:
+        await self.emit_async(StageStarted(story_id=self.story_id, stage_name=stage.name, timestamp=datetime.now()))
+
+    async def on_stage_completed_async(self, stage: StageRecord) -> None:
+        completed_at = datetime.now()
+        duration_seconds = stage.duration_seconds
+        if duration_seconds is None:
+            duration_seconds = (completed_at - stage.started_at).total_seconds()
+        await self.emit_async(
+            StageCompleted(
+                story_id=self.story_id,
+                stage_name=stage.name,
+                timestamp=completed_at,
+                duration_seconds=duration_seconds,
+            )
+        )
+
     def build_stage_timeline(self) -> str:
         if not self.stages:
             return "<no stages>"

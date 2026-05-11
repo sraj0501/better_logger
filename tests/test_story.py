@@ -59,8 +59,7 @@ def test_sync_story_production_forces_lean() -> None:
 
 
 def test_async_story_records_all_stage_events() -> None:
-    # Stage lifecycle uses sync emit(); use a sync renderer. Async renderers are only
-    # fully applied to events dispatched via emit_async (story enter/exit, failures).
+    # async with stage uses emit_async; sync CapturingRenderer.handle still receives stage events.
     cap = CapturingRenderer()
 
     async def run() -> None:

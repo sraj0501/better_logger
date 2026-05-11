@@ -67,6 +67,18 @@ async with story("Import Customers"):
         await insert()
 ```
 
+### How events reach renderers (sync vs async)
+
+The runtime dispatches lifecycle events to your **`renderers`** through one of two paths:
+
+| Context | Dispatch API | Async `handle()` |
+|---------|----------------|------------------|
+| `with story` / `with stage` | `emit()` (sync) | Not awaited |
+| `async with story` | `emit_async()` | Awaited for story start, failure, story complete |
+| `async with stage` (inside `async with story`) | `emit_async()` | Awaited for `StageStarted` / `StageCompleted` |
+
+Use **`async with stage`** in async handlers when you use an async renderer and need stage boundaries to run through the same async path as the story. **`with stage`** remains valid (for example in sync helpers) and keeps stage events on the sync path.
+
 ## Failure diagnostics (lean vs rich)
 
 Diagnostics are **not** tied to Python logging levels. You control depth with **environment** and an explicit **mode**:
@@ -131,7 +143,7 @@ async def create_customer(payload: CustomerIn):
         return {"ok": True}
 ```
 
-Each request runs inside **`async with story(...)`**, so async renderers (and `emit_async`) are used end-to-end for that story.
+Each request runs inside **`async with story(...)`**, so story and failure events use **`emit_async`**. Stage events use **`emit_async`** when you declare **`async with stage`** in the handler (recommended in the snippet above). If you use sync **`with stage`** instead, only those stage events stay on the sync **`emit()`** path.
 
 ## FastAPI — decorator style
 
@@ -245,6 +257,8 @@ Implement a `handle` method to receive all lifecycle events. Both sync and async
 renderers are supported:
 
 ```python
+from runtime_narrative import stage, story
+
 # Sync renderer
 class MyRenderer:
     def handle(self, event):
@@ -259,7 +273,8 @@ with story("My Story", renderers=[MyRenderer()]):
     ...
 
 async with story("My Story", renderers=[MyAsyncRenderer()]):
-    ...
+    async with stage("Step"):
+        ...
 ```
 
 Events: `StoryStarted`, `StageStarted`, `StageCompleted`, `FailureOccurred`,
